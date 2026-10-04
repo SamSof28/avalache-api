@@ -16,7 +16,7 @@ public class AvalanchaService {
         
         while (filtrador.size() != 0){
             mesesTranscurridos += 1;
-            BigDecimal dineroDisponibleEsteMes = usuario.getMonto_extra();
+            BigDecimal dineroDisponibleEsteMes = usuario.getMontoExtra();
 
             while (dineroDisponibleEsteMes.compareTo(BigDecimal.ZERO) > 0 && filtrador.size() != 0){
                 DeudaUsuario current = filtrador.poll();

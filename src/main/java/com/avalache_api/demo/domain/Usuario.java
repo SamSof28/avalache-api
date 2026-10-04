@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 
-import com.avalache_api.demo.domain.DeudaUsuario;
 
 public class Usuario {
     @Getter @Setter
@@ -14,16 +13,12 @@ public class Usuario {
     private List<DeudaUsuario> deudas;
 
     @Getter @Setter
-    private BigDecimal ingresos;
-
-    @Getter @Setter
-    private BigDecimal monto_extra;
+    private BigDecimal montoExtra;
 
     public Usuario(String nombreUsuario, List<DeudaUsuario> deudas,
-        BigDecimal ingresos, BigDecimal monto_extra){
+         BigDecimal montoExtra){
             this.nombreUsuario = nombreUsuario;
             this.deudas = deudas;
-            this.ingresos = ingresos;
-            this.monto_extra = monto_extra;
+            this.montoExtra = montoExtra;
         }
 }  

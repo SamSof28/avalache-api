@@ -12,19 +12,15 @@ public class DeudaUsuario implements Comparable<DeudaUsuario> {
     private BigDecimal saldo;
 
     @Getter @Setter
-    private Integer numCuotas;
-
-    @Getter @Setter
     private BigDecimal pagoMinimo;
 
     @Getter @Setter
     private BigDecimal tasaInteres;
 
     public DeudaUsuario(String nombreDeuda, BigDecimal saldo,
-         BigDecimal pagoMinimo, Integer numCuotas, BigDecimal tasaInteres){
+         BigDecimal pagoMinimo, BigDecimal tasaInteres){
             this.nombreDeuda = nombreDeuda;
             this.saldo = saldo;
-            this.numCuotas = numCuotas;
             this.pagoMinimo = pagoMinimo;
             this.tasaInteres = tasaInteres;
          }
