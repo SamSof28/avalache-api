@@ -29,6 +29,7 @@ El repositorio contiene el núcleo de simulación en `AvalanchaService` y un mod
 - Cálculo iterativo de meses transcurridos.
 - Priorización de la deuda con mayor tasa de interés.
 - Aplicación del monto extra mensual al saldo pendiente.
+- Liberación permanente de cada pago mínimo cuando una deuda queda saldada.
 - Capitalización mensual de intereses sobre las deudas restantes.
 - Modelos `Usuario` y `DeudaUsuario`.
 
@@ -46,9 +47,9 @@ El repositorio contiene el núcleo de simulación en `AvalanchaService` y un mod
 flowchart LR
     A[Usuario y deudas] --> B[AvalanchaService]
     B --> C{PriorityQueue}
-    C --> D[Deuda con mayor tasa]
-    D --> E[Aplicar monto extra]
-    E --> F[Capitalizar intereses restantes]
+    C --> D[Capitalizar intereses y pagar mínimos]
+    D --> E[Liberar pagos mínimos de deudas saldadas]
+    E --> F[Atacar la deuda con mayor tasa]
     F --> G[Meses transcurridos]
 ```
 
