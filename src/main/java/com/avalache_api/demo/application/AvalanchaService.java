@@ -7,6 +7,8 @@ import java.util.PriorityQueue;
 
 import org.springframework.stereotype.Service;
 
+import com.avalache_api.demo.application.dto.DeudaResultado;
+import com.avalache_api.demo.application.dto.ResultadoAvalancha;
 import com.avalache_api.demo.domain.Usuario;
 import com.avalache_api.demo.domain.DeudaUsuario;
 
@@ -15,22 +17,73 @@ public class AvalanchaService {
     private static final int MAX_MESES_SIMULACION = 600;
 
     public Integer ejecutarAvalancha(Usuario usuario) {
-        PriorityQueue<DeudaUsuario> deudas = new PriorityQueue<>(usuario.getDeudas());
+        Simulacion simulacion = ejecutarSimulacion(usuario.getDeudas(), usuario.getMontoExtra(), true);
+        return simulacion.resultado().mesesEstimados();
+    }
+
+    public ResultadoAvalancha simular(Usuario usuario) {
+        Simulacion simulacion = ejecutarSimulacion(usuario.getDeudas(), usuario.getMontoExtra(), false);
+        List<DeudaResultado> deudas = usuario.getDeudas().stream()
+            .map(deuda -> new DeudaResultado(
+                deuda.getNombreDeuda(),
+                deuda.getSaldo(),
+                simulacion.resultado().alcanzable() ? BigDecimal.ZERO : deuda.getSaldo(),
+                deuda.getTasaInteres()))
+            .toList();
+
+        return new ResultadoAvalancha(
+            simulacion.resultado().mesesEstimados(),
+            simulacion.resultado().alcanzable(),
+            simulacion.intereses(),
+            deudas
+        );
+    }
+
+    private Simulacion ejecutarSimulacion(
+        List<DeudaUsuario> deudasEntrada,
+        BigDecimal montoExtra,
+        boolean mutarEntrada
+    ) {
+        PriorityQueue<DeudaUsuario> deudas = new PriorityQueue<>();
+        deudasEntrada.forEach(deuda -> deudas.add(mutarEntrada ? deuda : copiar(deuda)));
         int mesesTranscurridos = 0;
-        BigDecimal montoExtraGlobal = usuario.getMontoExtra();
+        BigDecimal montoExtraGlobal = montoExtra;
+        BigDecimal intereses = BigDecimal.ZERO;
 
         while (!deudas.isEmpty()) {
             mesesTranscurridos++;
 
             if (mesesTranscurridos > MAX_MESES_SIMULACION) {
-                return -1;
+                return new Simulacion(
+                    new ResultadoAvalancha(-1, false, intereses, List.of()),
+                    intereses
+                );
             }
 
+            intereses = intereses.add(interesDelMes(deudas));
             montoExtraGlobal = aplicarFaseMantenimiento(deudas, montoExtraGlobal);
             montoExtraGlobal = aplicarFaseVoraz(deudas, montoExtraGlobal);
         }
 
-        return mesesTranscurridos;
+        return new Simulacion(
+            new ResultadoAvalancha(mesesTranscurridos, true, intereses, List.of()),
+            intereses
+        );
+    }
+
+    private static DeudaUsuario copiar(DeudaUsuario deuda) {
+        return new DeudaUsuario(
+            deuda.getNombreDeuda(),
+            deuda.getSaldo(),
+            deuda.getPagoMinimo(),
+            deuda.getTasaInteres()
+        );
+    }
+
+    private static BigDecimal interesDelMes(PriorityQueue<DeudaUsuario> deudas) {
+        return deudas.stream()
+            .map(deuda -> deuda.getSaldo().multiply(deuda.getTasaInteres()))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal aplicarFaseMantenimiento(
@@ -47,6 +100,7 @@ public class AvalanchaService {
             deuda.setSaldo(saldoConInteres);
 
             if (saldoConInteres.compareTo(deuda.getPagoMinimo()) <= 0) {
+                deuda.setSaldo(BigDecimal.ZERO);
                 montoExtraGlobal = montoExtraGlobal.add(deuda.getPagoMinimo());
             } else {
                 deuda.setSaldo(saldoConInteres.subtract(deuda.getPagoMinimo()));
@@ -57,6 +111,8 @@ public class AvalanchaService {
         deudas.addAll(deudasSobrevivientes);
         return montoExtraGlobal;
     }
+
+    private record Simulacion(ResultadoAvalancha resultado, BigDecimal intereses) {}
 
     private BigDecimal aplicarFaseVoraz(
         PriorityQueue<DeudaUsuario> deudas,
@@ -69,6 +125,7 @@ public class AvalanchaService {
 
             if (dineroParaAtacar.compareTo(deuda.getSaldo()) >= 0) {
                 dineroParaAtacar = dineroParaAtacar.subtract(deuda.getSaldo());
+                deuda.setSaldo(BigDecimal.ZERO);
                 montoExtraGlobal = montoExtraGlobal.add(deuda.getPagoMinimo());
             } else {
                 deuda.setSaldo(deuda.getSaldo().subtract(dineroParaAtacar));

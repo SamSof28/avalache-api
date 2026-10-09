@@ -2,6 +2,9 @@ package com.avalache_api.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootApplication
 public class DemoApplication {
@@ -10,4 +13,8 @@ public class DemoApplication {
 		SpringApplication.run(DemoApplication.class, args);
 	}
 
+	@Bean
+	ObjectMapper objectMapper() {
+		return new ObjectMapper();
+	}
 }
