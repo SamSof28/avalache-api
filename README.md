@@ -32,6 +32,9 @@ El repositorio contiene el núcleo de simulación en `AvalanchaService` y un mod
 - Liberación permanente de cada pago mínimo cuando una deuda queda saldada.
 - Capitalización mensual de intereses sobre las deudas restantes.
 - Modelos `Usuario` y `DeudaUsuario`.
+- Resultado estructurado de la simulación con intereses y saldos.
+- Generación de reportes PDF con recomendaciones financieras.
+- Adaptador opcional para Gemini con recomendación local de respaldo.
 
 ### En construcción
 
@@ -84,7 +87,15 @@ Inicia la aplicación:
 
 En Windows puedes usar `mvnw.cmd` en lugar de `./mvnw`.
 
-> Actualmente no hay endpoints publicados. El arranque permite validar la configuración de Spring; la interacción HTTP se incorporará en la siguiente iteración.
+Los endpoints disponibles son:
+
+```text
+POST /api/v1/avalancha/simular
+POST /api/v1/avalancha/reporte
+```
+
+El primer endpoint devuelve el número estimado de meses. El segundo devuelve un
+archivo PDF con el resultado, el resumen de deudas y una recomendación financiera.
 
 ## Ejemplo conceptual del dominio
 
@@ -116,6 +127,52 @@ var usuario = new Usuario(
 );
 
 Integer meses = avalanchaService.ejecutarAvalancha(usuario);
+```
+
+## Reporte PDF y Gemini
+
+El reporte no requiere una API key para funcionar: si Gemini no está configurado o
+no está disponible, se utiliza una recomendación local determinista y el PDF se
+genera normalmente.
+
+Para habilitar Gemini, configura la clave únicamente como variable de entorno:
+
+```bash
+export GEMINI_API_KEY="tu-clave-de-Google-AI-Studio"
+export GEMINI_API_MODEL="gemini-2.5-flash"
+```
+
+La aplicación utiliza estas propiedades:
+
+```properties
+gemini.api.key=${GEMINI_API_KEY:}
+gemini.api.url=${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta}
+gemini.api.model=${GEMINI_API_MODEL:gemini-2.5-flash}
+```
+
+Nunca incluyas una clave real en `application.properties`, el código fuente, los
+logs o un commit. Si una clave se expone, revócala desde Google AI Studio y crea
+otra. La recomendación generada es educativa y no sustituye asesoría financiera.
+
+Ejemplo de solicitud del PDF:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/avalancha/reporte \
+  -H 'Content-Type: application/json' \
+  -o reporte-financiero.pdf \
+  -d '{
+    "nombreUsuario": "cliente-demo",
+    "montoExtra": 500000,
+    "deudas": [
+      {
+        "nombreDeuda": "Tarjeta de crédito",
+        "saldo": 2500000,
+        "numCuotas": 24,
+        "pagoMinimo": 150000,
+        "tasaInteres": 0.025
+      }
+    ]
+  }'
 ```
 
 Las tasas del ejemplo son valores mensuales expresados como proporciones decimales. En una API pública se documentará y validará de forma explícita la unidad de cada tasa para evitar interpretaciones incorrectas.
