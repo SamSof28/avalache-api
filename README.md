@@ -1,233 +1,417 @@
 # Avalancha API
 
-![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F?logo=springboot&logoColor=white)
-![Maven](https://img.shields.io/badge/Maven-wrapper-C71A36?logo=apachemaven&logoColor=white)
-![Estado](https://img.shields.io/badge/estado-MVP%20en%20construcci%C3%B3n-157A6E)
+API REST en Java y Spring Boot para simular el pago de deudas personales con el
+método **avalancha**, generar recomendaciones financieras y entregar un reporte
+PDF descargable.
 
-Motor de simulación para priorizar el pago de deudas personales mediante el método **avalancha**: se atiende primero la deuda con mayor tasa de interés para reducir el costo financiero total y estimar el tiempo necesario para quedar libre de obligaciones.
+La simulación prioriza las obligaciones con mayor tasa de interés, conserva los
+pagos mínimos de las demás deudas y reutiliza cada pago liberado para acelerar
+la siguiente obligación. Gemini redacta una recomendación educativa a partir del
+resultado calculado; no decide los meses ni reemplaza la lógica financiera.
 
-> Proyecto de portafolio orientado a problemas reales de inclusión y salud financiera. Está diseñado como una base técnica para evolucionar hacia un servicio bancario responsable, seguro y fácil de explicar al usuario.
-
-## Por qué importa
-
-Las personas con varias obligaciones suelen necesitar algo más que una lista de saldos: necesitan entender qué decisión reduce más rápido el costo de su deuda. Avalancha API convierte esa decisión en una simulación reproducible y auditable.
-
-El proyecto demuestra:
-
-- Modelado de usuario y obligaciones financieras con `BigDecimal`.
-- Priorización determinista por tasa de interés usando `PriorityQueue`.
-- Separación inicial entre dominio, aplicación e infraestructura.
-- Una base preparada para incorporar validación, persistencia, API REST y observabilidad.
+> El proyecto es una herramienta educativa. Sus resultados dependen de los datos
+> recibidos y de los supuestos de la simulación. No constituye asesoría
+> financiera, legal ni crediticia.
 
 ## Estado actual
 
-El repositorio contiene el núcleo de simulación en `AvalanchaService` y un modelo de dominio inicial. La aplicación Spring Boot arranca correctamente y cuenta con una prueba de carga de contexto.
+La aplicación está funcional para desarrollo local:
 
-### Implementado
+- API REST para simulación.
+- Validación de solicitudes.
+- Cálculo de meses, intereses estimados y saldos.
+- Generación de reportes PDF.
+- Integración opcional con Gemini 3.8 Flash.
+- Recomendación local de respaldo cuando Gemini no está configurado o no responde.
+- Descarga HTTP del PDF mediante `Content-Disposition`.
+- Pruebas unitarias, de contexto y del controlador.
 
-- Cálculo iterativo de meses transcurridos.
-- Priorización de la deuda con mayor tasa de interés.
-- Aplicación del monto extra mensual al saldo pendiente.
-- Liberación permanente de cada pago mínimo cuando una deuda queda saldada.
-- Capitalización mensual de intereses sobre las deudas restantes.
-- Modelos `Usuario` y `DeudaUsuario`.
-- Resultado estructurado de la simulación con intereses y saldos.
-- Generación de reportes PDF con recomendaciones financieras.
-- Adaptador opcional para Gemini con recomendación local de respaldo.
+La persistencia todavía no está habilitada. Aunque el proyecto incluye
+dependencias relacionadas con JPA y PostgreSQL, la configuración actual excluye la
+autoconfiguración de base de datos para que el MVP funcione sin PostgreSQL.
 
-### En construcción
+## Stack tecnológico
 
-- Controlador REST y contratos de entrada/salida.
-- Validación de montos, tasas, cuotas y datos obligatorios.
-- Persistencia con PostgreSQL y repositorios JPA.
-- Pruebas unitarias del algoritmo y pruebas de integración.
-- Autenticación, autorización, trazabilidad y manejo uniforme de errores.
+- Java 21.
+- Spring Boot 4.1.1.
+- Spring Web MVC.
+- Spring Validation.
+- Maven Wrapper.
+- Jackson Databind.
+- OpenPDF 2.0.3.
+- JUnit y pruebas Spring MVC.
+- Gemini API mediante HTTP REST.
 
-## Diseño actual
+## Arquitectura
 
-```mermaid
-flowchart LR
-    A[Usuario y deudas] --> B[AvalanchaService]
-    B --> C{PriorityQueue}
-    C --> D[Capitalizar intereses y pagar mínimos]
-    D --> E[Liberar pagos mínimos de deudas saldadas]
-    E --> F[Atacar la deuda con mayor tasa]
-    F --> G[Meses transcurridos]
+```text
+HTTP
+└── AvalanchaController
+    ├── UsuarioRequestDTO + validación
+    └── UsuarioMapper
+        └── Usuario / DeudaUsuario
+
+Aplicación
+├── AvalanchaService
+│   └── Simulación de la estrategia avalancha
+├── ReporteFinancieroService
+│   ├── ConsejoFinancieroPort
+│   │   └── GeminiAdapter
+│   └── PdfReportPort
+│       └── OpenPdfReportAdapter
+└── DTOs de resultado y reporte
 ```
 
-La regla de negocio vive en el servicio de aplicación y la prioridad se define en `DeudaUsuario`. Esto facilita reemplazar la entrada actual por un endpoint REST sin mezclar transporte HTTP con el cálculo financiero.
+La aplicación mantiene separadas las responsabilidades:
+
+1. `AvalanchaService` calcula el resultado financiero.
+2. `GeminiAdapter` solicita el texto de recomendación.
+3. `OpenPdfReportAdapter` compone el documento.
+4. `AvalanchaController` expone el contrato HTTP.
+
+## Estructura relevante
+
+```text
+src/main/java/com/avalache_api/demo/
+├── application/
+│   ├── AvalanchaService.java
+│   ├── ConsejoFinancieroPort.java
+│   ├── PdfReportPort.java
+│   ├── ReporteFinancieroService.java
+│   └── dto/
+├── domain/
+│   ├── DeudaUsuario.java
+│   └── Usuario.java
+└── infrastructure/
+    ├── AvalanchaController.java
+    ├── DeudaRequestDTO.java
+    ├── UsuarioMapper.java
+    ├── UsuarioRequestDTO.java
+    ├── gemini/
+    │   └── GeminiAdapter.java
+    └── pdf/
+        └── OpenPdfReportAdapter.java
+
+src/test/java/com/avalache_api/demo/
+├── AvalanchaControllerTest.java
+├── AvalanchaServiceTest.java
+├── DemoApplicationTests.java
+├── GeminiAdapterTest.java
+└── ReporteFinancieroServiceTest.java
+```
 
 ## Requisitos
 
-- Java 21+
-- Maven 3.9+ o el Maven Wrapper incluido
-- PostgreSQL será necesario cuando se habilite la persistencia; el MVP actual no requiere una base de datos para arrancar
+- Java 21 o superior.
+- Git.
+- Maven no es obligatorio porque el repositorio incluye `mvnw`.
+- Conexión a internet y una API key de Google AI Studio únicamente si se desea
+  usar Gemini real.
+- PostgreSQL no es necesario para ejecutar la versión actual.
 
-## Ejecutar localmente
+## Configuración segura de Gemini
 
-Clona el repositorio y entra en su carpeta:
+La aplicación utiliza el modelo **Gemini 3.8 Flash** por defecto:
+
+```text
+gemini-3.8-flash
+```
+
+La configuración se encuentra en
+[`src/main/resources/application.properties`](src/main/resources/application.properties):
+
+```properties
+gemini.api.key=${GEMINI_API_KEY:}
+gemini.api.url=${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta}
+gemini.api.model=${GEMINI_API_MODEL:gemini-3.8-flash}
+```
+
+La API key nunca debe escribirse directamente en `application.properties`, Java,
+README, pruebas, commits o logs.
+
+### Usar un archivo `.env` local
+
+El repositorio incluye `.env.example` como plantilla. Crea un archivo `.env` en
+la raíz del proyecto:
+
+```dotenv
+GEMINI_API_KEY=tu-clave-real
+GEMINI_API_MODEL=gemini-3.8-flash
+```
+
+`.env` está excluido por `.gitignore`. Para cargarlo en Linux o macOS antes de
+iniciar Spring Boot:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+También puedes definir las variables directamente en la terminal o en el sistema
+operativo. Spring Boot no carga `.env` automáticamente; las variables deben estar
+exportadas antes de iniciar la aplicación.
+
+Si una clave se expone, revócala inmediatamente desde
+[Google AI Studio](https://aistudio.google.com/app/apikey) y genera una nueva.
+
+### Selección del modelo
+
+El modelo se puede cambiar sin modificar Java mediante `GEMINI_API_MODEL`.
+La aplicación usa `gemini-3.8-flash` como valor predeterminado, siempre que el
+modelo esté disponible para la API key y la cuenta utilizada. Los nombres,
+cuotas y disponibilidad de modelos pueden cambiar; deben confirmarse en la
+documentación oficial de Google:
+
+- [Modelos de Gemini](https://ai.google.dev/gemini-api/docs/models).
+- [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash).
+- [Referencia de `generateContent`](https://ai.google.dev/api/generate-content).
+
+Si Gemini no está configurado, falla la conexión, la clave es inválida o el
+modelo no está disponible, el reporte continúa mediante una recomendación local
+determinista. En ese caso la simulación y el PDF siguen funcionando, pero el
+texto no proviene de Gemini.
+
+## Ejecución
+
+Clona el repositorio y entra en la carpeta:
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
 cd avalache-api
 ```
 
-Ejecuta las pruebas:
+Ejecuta todas las pruebas:
 
 ```bash
 ./mvnw test
 ```
 
-Inicia la aplicación:
+Inicia la aplicación sin Gemini:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-En Windows puedes usar `mvnw.cmd` en lugar de `./mvnw`.
+Inicia la aplicación usando `.env`:
 
-Los endpoints disponibles son:
+```bash
+set -a
+source .env
+set +a
+./mvnw spring-boot:run
+```
+
+La aplicación inicia en:
 
 ```text
+http://localhost:8080
+```
+
+En Windows utiliza `mvnw.cmd` y configura las variables con PowerShell.
+
+## Endpoints
+
+### Simulación simple
+
+```http
 POST /api/v1/avalancha/simular
+Content-Type: application/json
+```
+
+Devuelve un número entero con los meses estimados. Si la deuda no puede
+liquidarse dentro del límite interno de 600 meses, devuelve `-1`.
+
+### Reporte financiero PDF
+
+```http
 POST /api/v1/avalancha/reporte
+Content-Type: application/json
+Accept: application/pdf
 ```
 
-El primer endpoint devuelve el número estimado de meses. El segundo devuelve un
-archivo PDF con el resultado, el resumen de deudas y una recomendación financiera.
+Devuelve:
 
-## Ejemplo conceptual del dominio
-
-El motor recibe un usuario con un monto adicional mensual y una colección de deudas. Cada deuda contiene saldo, pago mínimo, número de cuotas y tasa de interés.
-
-```java
-var deudas = List.of(
-    new DeudaUsuario(
-        "Tarjeta de crédito",
-        new BigDecimal("2500000"),
-        new BigDecimal("150000"),
-        24,
-        new BigDecimal("0.025")
-    ),
-    new DeudaUsuario(
-        "Crédito de libre inversión",
-        new BigDecimal("6000000"),
-        new BigDecimal("300000"),
-        36,
-        new BigDecimal("0.015")
-    )
-);
-
-var usuario = new Usuario(
-    "cliente-demo",
-    deudas,
-    new BigDecimal("4500000"),
-    new BigDecimal("500000")
-);
-
-Integer meses = avalanchaService.ejecutarAvalancha(usuario);
+```http
+200 OK
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="reporte-financiero.pdf"
 ```
 
-## Reporte PDF y Gemini
+El PDF incluye:
 
-El reporte no requiere una API key para funcionar: si Gemini no está configurado o
-no está disponible, se utiliza una recomendación local determinista y el PDF se
-genera normalmente.
+- Nombre del usuario.
+- Tiempo estimado para salir de deudas.
+- Intereses estimados.
+- Recomendación financiera.
+- Resumen de saldos.
+- Advertencia de uso educativo.
 
-Para habilitar Gemini, configura la clave únicamente como variable de entorno:
+## Contrato de entrada
+
+El cuerpo de ambos endpoints utiliza esta estructura:
+
+```json
+{
+  "nombreUsuario": "cliente-demo",
+  "montoExtra": 500000,
+  "deudas": [
+    {
+      "nombreDeuda": "Tarjeta de credito",
+      "saldo": 2500000,
+      "numCuotas": 24,
+      "pagoMinimo": 150000,
+      "tasaInteres": 0.025
+    }
+  ]
+}
+```
+
+Reglas de validación actuales:
+
+- `nombreUsuario` es obligatorio y no puede estar vacío.
+- `deudas` debe contener al menos una deuda.
+- Cada nombre de deuda es obligatorio.
+- `saldo` debe ser positivo.
+- `numCuotas` debe ser positivo.
+- `pagoMinimo` debe ser positivo.
+- `tasaInteres` debe ser cero o positiva.
+- `montoExtra` debe ser cero o positivo.
+
+Las tasas se interpretan como proporciones mensuales. Por ejemplo, `0.025`
+representa una tasa mensual del 2.5 %. La API todavía no convierte tasas
+efectivas anuales ni realiza reglas bancarias de redondeo.
+
+## Ejemplos de uso
+
+### Generar y descargar un PDF
 
 ```bash
-export GEMINI_API_KEY="tu-clave-de-Google-AI-Studio"
-export GEMINI_API_MODEL="gemini-2.5-flash"
-```
-
-La aplicación utiliza estas propiedades:
-
-```properties
-gemini.api.key=${GEMINI_API_KEY:}
-gemini.api.url=${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta}
-gemini.api.model=${GEMINI_API_MODEL:gemini-2.5-flash}
-```
-
-Nunca incluyas una clave real en `application.properties`, el código fuente, los
-logs o un commit. Si una clave se expone, revócala desde Google AI Studio y crea
-otra. La recomendación generada es educativa y no sustituye asesoría financiera.
-
-Ejemplo de solicitud del PDF:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/avalancha/reporte \
-  -H 'Content-Type: application/json' \
+curl --fail-with-body -sS \
+  -X POST http://localhost:8080/api/v1/avalancha/reporte \
+  -H "Content-Type: application/json" \
+  -D headers.txt \
   -o reporte-financiero.pdf \
   -d '{
     "nombreUsuario": "cliente-demo",
     "montoExtra": 500000,
     "deudas": [
       {
-        "nombreDeuda": "Tarjeta de crédito",
+        "nombreDeuda": "Tarjeta de credito",
         "saldo": 2500000,
         "numCuotas": 24,
         "pagoMinimo": 150000,
         "tasaInteres": 0.025
+      },
+      {
+        "nombreDeuda": "Credito personal",
+        "saldo": 6000000,
+        "numCuotas": 36,
+        "pagoMinimo": 300000,
+        "tasaInteres": 0.015
       }
     ]
   }'
 ```
 
-Las tasas del ejemplo son valores mensuales expresados como proporciones decimales. En una API pública se documentará y validará de forma explícita la unidad de cada tasa para evitar interpretaciones incorrectas.
+Verifica los headers y el archivo:
 
-## Estructura del proyecto
-
-```text
-src/main/java/com/avalache_api/demo/
-├── application/       # Casos de uso y reglas de aplicación
-├── domain/             # Usuario, deuda y reglas de prioridad
-└── infrastructure/     # DTOs y futura entrada HTTP/persistencia
+```bash
+cat headers.txt
+file reporte-financiero.pdf
+head -c 4 reporte-financiero.pdf
 ```
 
-## Hoja de ruta técnica
+El archivo debe indicar que es PDF y comenzar con:
 
-1. **Contrato de API:** añadir `POST /api/v1/simulaciones`, DTOs inmutables, validación y una respuesta con plan de pagos, meses estimados e intereses proyectados.
-2. **Corrección financiera:** definir con el negocio la fórmula de interés, pagos mínimos, redondeo, fechas de corte y casos de saldo cero antes de exponer resultados a usuarios.
-3. **Calidad:** cubrir casos límite con JUnit, pruebas de integración, análisis estático y un pipeline de integración continua.
-4. **Persistencia:** incorporar PostgreSQL mediante migraciones versionadas, repositorios y separación entre entidades y dominio.
-5. **Seguridad y operación:** autenticación, autorización, protección de datos personales, logs estructurados, métricas, trazas y límites de consumo.
-6. **Entrega:** empaquetar en contenedor, desplegar en un entorno cloud y publicar documentación versionada junto con el contrato OpenAPI.
+```text
+%PDF
+```
 
-## Documentación y deployment futuro
+Si tienes Poppler instalado, puedes inspeccionar el contenido:
 
-La evolución recomendada es separar dos necesidades:
+```bash
+pdfinfo reporte-financiero.pdf
+pdftotext reporte-financiero.pdf -
+```
 
-- **Documentación de API:** generar `openapi.yaml` desde el contrato y servir Swagger UI para que un desarrollador pueda probar cada operación.
-- **Documentación del producto y arquitectura:** construir un sitio con MkDocs Material o Docusaurus, incluyendo decisiones técnicas, modelo de dominio, reglas financieras, diagramas y guías de operación.
+### Solicitud inválida
 
-Una primera publicación de bajo costo puede usar **GitHub Pages** mediante GitHub Actions:
+```bash
+curl -i \
+  -X POST http://localhost:8080/api/v1/avalancha/reporte \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombreUsuario": "",
+    "montoExtra": -1,
+    "deudas": []
+  }'
+```
 
-1. Mantener los documentos en `docs/` y el contrato en `docs/openapi.yaml`.
-2. Configurar MkDocs para construir el sitio estático.
-3. Ejecutar `mkdocs build --strict` en cada pull request para detectar enlaces o referencias rotas.
-4. Publicar el directorio `site/` en GitHub Pages desde una rama o mediante Pages Artifact.
-5. Versionar la documentación cuando cambie el contrato (`/docs/v1/`, `/docs/v2/`).
+La respuesta esperada es `400 Bad Request` y no debe generarse un PDF.
 
-Para un entorno más cercano a producción, el mismo sitio puede publicarse detrás de un dominio corporativo y un CDN. La documentación nunca debe incluir credenciales, datos reales de clientes ni ejemplos que expongan información personal.
+## Flujo de procesamiento
 
-## Principios para una evolución bancaria
+1. El controlador recibe y valida el JSON.
+2. `UsuarioMapper` transforma el DTO HTTP al dominio.
+3. `AvalanchaService` prioriza deudas y simula los pagos mensuales.
+4. `ReporteFinancieroService` combina el resultado con una recomendación.
+5. `GeminiAdapter` solicita el texto a Gemini 3.8 Flash o activa el fallback.
+6. `OpenPdfReportAdapter` genera el documento en memoria.
+7. El controlador devuelve el PDF como descarga HTTP.
 
-- **Privacidad por diseño:** usar datos sintéticos y minimizar la información personal almacenada.
-- **Explicabilidad:** mostrar por qué una deuda fue priorizada y qué supuestos produjo el resultado.
-- **Precisión:** representar dinero con `BigDecimal`, documentar moneda, escala y reglas de redondeo.
-- **Trazabilidad:** conservar versión del algoritmo, fecha de simulación y parámetros utilizados.
-- **Responsabilidad:** presentar el resultado como una simulación educativa y validarlo con expertos financieros antes de usarlo para decisiones reales.
+Gemini no calcula el número de meses ni modifica los saldos. La lógica financiera
+permanece dentro de la aplicación para que el resultado sea reproducible y
+auditable.
 
-## Contribuir
+## Pruebas
 
-Las contribuciones deben incluir una descripción del caso de uso, pruebas para cambios de reglas financieras y una nota sobre cualquier impacto en el contrato público. Para cambios relevantes, abrir primero un issue con la propuesta técnica.
+Ejecuta:
+
+```bash
+./mvnw test
+```
+
+La suite cubre:
+
+- Reglas principales del algoritmo avalancha.
+- Liquidación de saldos y liberación de pagos mínimos.
+- No mutación de las deudas originales al generar reportes.
+- Generación de un PDF válido.
+- Headers y contenido de la respuesta HTTP.
+- Rechazo de solicitudes inválidas.
+- Fallback local cuando Gemini no tiene API key.
+- Carga del contexto Spring.
+
+Las pruebas automáticas no consumen la API real de Gemini ni requieren una clave.
+La integración real se valida manualmente mediante `GEMINI_API_KEY`, revisando
+los logs y descargando el PDF.
+
+## Seguridad y limitaciones actuales
+
+- No se almacenan API keys en el repositorio.
+- `.env` está excluido por `.gitignore`.
+- El adaptador no registra la clave ni el prompt completo.
+- Gemini es un proveedor opcional y tiene fallback local.
+- No hay autenticación ni autorización.
+- No hay persistencia de usuarios o reportes.
+- No hay rate limiting ni observabilidad avanzada.
+- Los datos financieros enviados al endpoint deben considerarse sensibles.
+- Antes de un uso productivo se requiere revisión legal, financiera y de
+  protección de datos.
+
+## Próximos pasos
+
+1. Formalizar el contrato OpenAPI.
+2. Definir moneda, redondeos, fechas de corte y reglas financieras con expertos.
+3. Añadir autenticación, autorización y rate limiting.
+4. Incorporar manejo uniforme de errores.
+5. Añadir persistencia con migraciones versionadas.
+6. Añadir métricas, trazas y auditoría.
+7. Separar configuración de desarrollo, pruebas y producción.
+8. Añadir pruebas de integración con un servidor HTTP de Gemini simulado.
+9. Revisar el uso de datos personales y el texto de las recomendaciones.
 
 ## Licencia
 
-La licencia todavía no ha sido definida. Antes de publicar el repositorio como código abierto, añadir una licencia explícita y revisar qué partes del proyecto pueden compartirse públicamente.
-
-## Autor
-
-Proyecto desarrollado como demostración de ingeniería backend con Java y Spring Boot, enfocado en convertir un problema financiero cotidiano en una solución clara, medible y evolutiva.
+La licencia del proyecto todavía no ha sido definida.
